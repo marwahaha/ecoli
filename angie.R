@@ -1,10 +1,10 @@
 library(dplyr)
-load("/home/kunal/Downloads/ChemFieldLab2018(1).rdata")
+load("/home/kunal/Downloads/ChemFieldLab2018(2).rdata")
 
-# Get all Ecoli samples
-# Question for Angie: Does sampleType matter?u Should we ignore either "Split" or "Duplicate"?
+# Get all "Regular" Ecoli samples (ignoring "Split" and "Duplicate")
 ecoli_all <- ChemFieldLab2018 %>%
-  filter(Constituent =="E. coli (MPN)")
+  filter(Constituent =="E. coli (MPN)") %>%
+  filter(SampleType == "Regular")
 
 
 get_ecoli_results <- function(ecoli_all, TEN_PERCENT_THRESHOLD, GEOMETRIC_MEAN_THRESHOLD) {
@@ -18,7 +18,6 @@ get_ecoli_results <- function(ecoli_all, TEN_PERCENT_THRESHOLD, GEOMETRIC_MEAN_T
       filter(Date > start) %>%
       filter(Date <= end)
     
-    # Note for Angie: There is an issue with TMAS data, with some rows having no SiteClassification
     ecoli_summary <- ecoli_90 %>%
       group_by(Year, WaterBodyReport, SiteCode, SiteClassification)%>%
       summarise(
