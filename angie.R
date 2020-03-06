@@ -1,5 +1,9 @@
 library(dplyr)
-load("/home/kunal/Downloads/ChemFieldLab2018(2).rdata")
+#load("/home/kunal/Downloads/ChemFieldLab2018(2).rdata")
+#The path Angie needs to upload her data file
+#WHEN CONNECTED TO VPN AND PATH NOT SEEN
+load("//pinwebserver01/C$/Shares/Penobscot Indian Nation Environmental Database/Reports/AnnualBaseline/2018/ChemFieldLab2018.RData")
+
 
 # Get all "Regular" Ecoli samples (ignoring "Split" and "Duplicate")
 ecoli_all <- ChemFieldLab2018 %>%
