@@ -64,3 +64,21 @@ get_ecoli_results <- function(ecoli_all, TEN_PERCENT_THRESHOLD, GEOMETRIC_MEAN_T
 out <- get_ecoli_results(ecoli_all, 236, 64)
 
 failing <- out %>% filter(success != TRUE)
+passing <- out %>% filter(success == TRUE)
+
+# Plot and inspect failing sites
+library(ggplot2)
+failing_with_data <- merge(ecoli_all, failing)
+
+# after the image loads, press "Zoom" to see the whole thing
+ggplot(failing_with_data ,
+       mapping = aes(x=SampleDatetime,y=ResultValue, color=SiteCode)) +
+  geom_point() +
+  facet_wrap(facets = vars(SiteCode, WaterBodyReport)) +
+ theme(legend.position = "none")
+
+# other things to try:
+# * facet_grid
+# * Grouping by SiteClassification
+# * Change thresholds and see what changes
+# * Change 90-day window range and see what happens
