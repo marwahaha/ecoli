@@ -2,7 +2,10 @@ library(dplyr)
 #load("/home/kunal/Downloads/ChemFieldLab2018(2).rdata")
 #The path Angie needs to upload her data file
 #WHEN CONNECTED TO VPN AND PATH NOT SEEN
-load("//pinwebserver01/C$/Shares/Penobscot Indian Nation Environmental Database/Reports/AnnualBaseline/2018/ChemFieldLab2018.RData")
+#load("//pinwebserver01/C$/Shares/Penobscot Indian Nation Environmental Database/Reports/AnnualBaseline/2018/ChemFieldLab2018.RData")
+#WHEN CONNECTED TO SERVER
+load("//pinwebserver01/Shares/Penobscot Indian Nation Environmental Database/Reports/AnnualBaseline/2018/ChemFieldLab2018.RData")
+
 
 
 # Get all "Regular" Ecoli samples (ignoring "Split" and "Duplicate")
@@ -10,7 +13,7 @@ ecoli_all <- ChemFieldLab2018 %>%
   filter(Constituent =="E. coli (MPN)") %>%
   filter(SampleType == "Regular")
 
-
+#HOW/WHERE DO WE INPUT THE THRESHOLD VALUES FROM THE COLUMNS Ecoli_maxCol and Ecoli_GeoMaxColi?
 analyze_90_day_window <- function(ecoli_all, start, end, TEN_PERCENT_THRESHOLD, GEOMETRIC_MEAN_THRESHOLD) {
   # Get data in 90-day window
   ecoli_90 <- ecoli_all %>%
@@ -27,13 +30,16 @@ analyze_90_day_window <- function(ecoli_all, start, end, TEN_PERCENT_THRESHOLD, 
       RuleTenPercent = NumResultsAboveTenPercentThreshold <= NumResultsTenPercent,
       geometric_mean = exp(mean(log(ResultValue))),
       RuleGeometricMean= geometric_mean <= GEOMETRIC_MEAN_THRESHOLD,
-      Passing= RuleTenPercent&RuleGeometricMean,
+      Passing= RuleTenPercent&RuleGeometricMean, #I think this needs to be an OR rule
+      PassInst=RuleTenPercent,#Trying to show which sites pass the instantaneous rule
+      PassGM=RuleGeometricMean,#Trying to show which sites pass the geo mean rule
     )
 
   return(ecoli_summary)
 }
 
-
+#HOW/WHERE DO WE INPUT THE THRESHOLD VALUES FROM THE COLUMNS Ecoli_maxCol and Ecoli_GeoMaxColi?
+#CAN WE SEPARATE OUT THE PASSING INSTANTANEOUS AND GEO MEAN?
 get_ecoli_results <- function(ecoli_all, TEN_PERCENT_THRESHOLD, GEOMETRIC_MEAN_THRESHOLD) {
   # The initial 90-day window ends on the date of the last sample.
   # The window moves back by 1 day each time until it includes the date of the first sample.
@@ -61,6 +67,7 @@ get_ecoli_results <- function(ecoli_all, TEN_PERCENT_THRESHOLD, GEOMETRIC_MEAN_T
   return(ecoli_output)
 }
 
+#HOW/WHERE DO WE INPUT THE THRESHOLD VALUES FROM THE COLUMNS Ecoli_maxCol and Ecoli_GeoMaxColi?
 out <- get_ecoli_results(ecoli_all, 236, 64)
 
 failing <- out %>% filter(success != TRUE)
