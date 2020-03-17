@@ -42,14 +42,6 @@ analyze_90_day_window <- function(ecoli_df, start) {
 }
 
 
-#FOR KUNAL: CAN WE SEPARATE OUT THE PASSING INSTANTANEOUS AND GEO MEAN?
-# If something is failing, you want to know
-# Which of INST or GM is failing
-# and which 90-day intervals is it failing
-# For each site, for each 90-day window:
-# * tell me how mnay samples collected
-# * tell me if Geo mean pass
-# * tell me if 10% rule pass
 get_ecoli_results <- function(ecoli_df) {
   
   # Earliest window starts 90 days before the first measurement.
@@ -66,21 +58,20 @@ get_ecoli_results <- function(ecoli_df) {
   while (start <= latest_window_start) {
     # Decide if rules pass for this 90-day window, and put it in full results.
     ecoli_summary <- analyze_90_day_window(ecoli_df, start)
-    ecoli_result <- ecoli_summary %>% select(Year, WaterBodyReport, SiteCode, SiteClassification, Ecoli_maxCol, Ecoli_GeoMaxCol, Failing)
-    ecoli_full_results <- rbind(ecoli_full_results,  ecoli_result)
+    ecoli_full_results <- rbind(ecoli_full_results,  ecoli_summary)
     # Move the 90-day window forward by one day.              
     start <- start + 1
   }
   
-  # Check if each area passed in all 90-day windows.
-  ecoli_output <- ecoli_full_results %>%
-    group_by(Year, WaterBodyReport, SiteCode, SiteClassification, Ecoli_maxCol, Ecoli_GeoMaxCol)%>%
-    summarize(fail=any(Failing))
-  
-  return(ecoli_output)
+  return(ecoli_full_results)
 }
 
-out <- get_ecoli_results(ecoli_all)
+full_results <- get_ecoli_results(ecoli_all)
+
+# Check if each area passed in all 90-day windows.
+out <- full_results %>%
+  group_by(Year, WaterBodyReport, SiteCode, SiteClassification, Ecoli_maxCol, Ecoli_GeoMaxCol)%>%
+  summarize(fail=any(Failing))
 
 failing <- out %>% filter(fail == TRUE)
 passing <- out %>% filter(fail != TRUE)
@@ -109,4 +100,12 @@ ggplot(failing_with_data ,
 # To discuss: The earliest and latest samples affect the pass/fail
 #  Since many of the 90-day windows only have these samples in them
 
+#FOR KUNAL: CAN WE SEPARATE OUT THE PASSING INSTANTANEOUS AND GEO MEAN?
+# If something is failing, you want to know
+# Which of INST or GM is failing
+# and which 90-day intervals is it failing
+# For each site, for each 90-day window:
+# * tell me how mnay samples collected
+# * tell me if Geo mean pass
+# * tell me if 10% rule pass
 
