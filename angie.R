@@ -21,18 +21,21 @@ analyze_90_day_window <- function(ecoli_df, start) {
     filter(Date <= (start + 90))
 
   # Summarize and check thresholds
+  # RuleTenPercent is TRUE when the site passes the 10% rule
+  # RuleGeometricMean is TRUE when the site passes the geo mean rule
   ecoli_summary <- ecoli_90 %>%
     group_by(Year, WaterBodyReport, SiteCode, SiteClassification, Ecoli_maxCol, Ecoli_GeoMaxCol)%>%
     summarise(
-      NumResults = n(),
-      NumResultsTenPercent = 0.1*n(),
-      NumResultsAboveTenPercentThreshold = sum(c(ResultValue > first(Ecoli_maxCol))),
-      RuleTenPercent = NumResultsAboveTenPercentThreshold <= NumResultsTenPercent,
+      NumSamples = n(),
+      # Ten percent rule
+      TenPercentOfSamples = 0.1*n(),
+      NumSamplesAboveTenPercentThreshold = sum(c(ResultValue > unique(Ecoli_maxCol))),
+      FailingTenPercentRule = NumSamplesAboveTenPercentThreshold > TenPercentOfSamples,
+      # Geo mean rule
       geometric_mean = exp(mean(log(ResultValue))),
-      RuleGeometricMean= geometric_mean <= first(Ecoli_GeoMaxCol),
-      Passing= RuleTenPercent & RuleGeometricMean,
-      PassInst=RuleTenPercent, # Which sites pass the instantaneous rule
-      PassGM=RuleGeometricMean, # Which sites pass the geo mean rule
+      EnoughSamplesForGeoMean = (n() >= 6), # Only do Geo Mean rule if at least 6 samples
+      FailingGeoMeanRule = geometric_mean > unique(Ecoli_GeoMaxCol),
+      Failing = FailingTenPercentRule | (EnoughSamplesForGeoMean & FailingGeoMeanRule),
     )
 
   return(ecoli_summary)
@@ -43,6 +46,10 @@ analyze_90_day_window <- function(ecoli_df, start) {
 # If something is failing, you want to know
 # Which of INST or GM is failing
 # and which 90-day intervals is it failing
+# For each site, for each 90-day window:
+# * tell me how mnay samples collected
+# * tell me if Geo mean pass
+# * tell me if 10% rule pass
 get_ecoli_results <- function(ecoli_df) {
   
   # Earliest window starts 90 days before the first measurement.
@@ -59,7 +66,7 @@ get_ecoli_results <- function(ecoli_df) {
   while (start <= latest_window_start) {
     # Decide if rules pass for this 90-day window, and put it in full results.
     ecoli_summary <- analyze_90_day_window(ecoli_df, start)
-    ecoli_result <- ecoli_summary %>% select(Year, WaterBodyReport, SiteCode, SiteClassification, Ecoli_maxCol, Ecoli_GeoMaxCol, Passing)
+    ecoli_result <- ecoli_summary %>% select(Year, WaterBodyReport, SiteCode, SiteClassification, Ecoli_maxCol, Ecoli_GeoMaxCol, Failing)
     ecoli_full_results <- rbind(ecoli_full_results,  ecoli_result)
     # Move the 90-day window forward by one day.              
     start <- start + 1
@@ -68,16 +75,16 @@ get_ecoli_results <- function(ecoli_df) {
   # Check if each area passed in all 90-day windows.
   ecoli_output <- ecoli_full_results %>%
     group_by(Year, WaterBodyReport, SiteCode, SiteClassification, Ecoli_maxCol, Ecoli_GeoMaxCol)%>%
-    summarize(success=all(Passing))
+    summarize(fail=any(Failing))
   
   return(ecoli_output)
 }
 
 out <- get_ecoli_results(ecoli_all)
 
-failing <- out %>% filter(success != TRUE)
-passing <- out %>% filter(success == TRUE)
-unknown <- out %>% filter(is.na(success))
+failing <- out %>% filter(fail == TRUE)
+passing <- out %>% filter(fail != TRUE)
+unknown <- out %>% filter(is.na(fail))
 
 # Plot and inspect failing sites
 library(ggplot2)
@@ -101,8 +108,5 @@ ggplot(failing_with_data ,
 
 # To discuss: The earliest and latest samples affect the pass/fail
 #  Since many of the 90-day windows only have these samples in them
-
-# * Geo mean only calc 6 samples in 90 day window
-
 
 
