@@ -1,4 +1,5 @@
 library(dplyr)
+library(lubridate)
 load("/home/kunal/Downloads/ChemFieldLab2018(2).rdata")
 #The path Angie needs to upload her data file
 #WHEN CONNECTED TO VPN AND PATH NOT SEEN
@@ -13,6 +14,17 @@ ecoli_all <- ChemFieldLab2018 %>%
   filter(SampleType == "Regular")
 
 
+# Function to see if a 90-day window is within April 15 to October 31st
+within_b_or_c_window <- function(start) {
+  year_of_window <- year(start)
+  min_date <- paste(year_of_window, 04, 15, sep="-") %>% ymd() %>% as.Date()
+  # Note: because our 90-day windows START on start and END "the day prior to" end,
+  # Our 90-day window end date can extend to Nov 1
+  max_date <- paste(year_of_window, 11, 1, sep="-") %>% ymd() %>% as.Date()
+  return((start >= min_date) & ((start + 90) <= max_date))
+}
+
+
 # Function to check ecoli data against thresholds in a 90-day window
 analyze_90_day_window <- function(ecoli_df, start) {
   # Get data within 90-day window
@@ -20,11 +32,17 @@ analyze_90_day_window <- function(ecoli_df, start) {
     filter(Date >= start) %>%
     filter(Date < (start + 90))
 
+  within_bc_window <- within_b_or_c_window(start)
+  
   # Summarize and check thresholds
   ecoli_summary <- ecoli_90 %>%
     group_by(Year, WaterBodyReport, SiteCode, SiteClassification, Ecoli_maxCol, Ecoli_GeoMaxCol) %>%
     summarise(
       NumSamples = n(),
+      # Class B/C should only use windows within 4/15 - 10/31
+      IsClassBOrC = (unique(SiteClassification) == "B") | (unique(SiteClassification) == "C"),
+      WithinBOrCWindow = within_bc_window,
+      Is_BC_And_Outside_Window = IsClassBOrC & !WithinBOrCWindow,
       # Ten percent rule
       TenPercentOfSamples = 0.1*n(),
       NumSamplesAboveTenPercentThreshold = sum(c(ResultValue > unique(Ecoli_maxCol))),
@@ -33,7 +51,12 @@ analyze_90_day_window <- function(ecoli_df, start) {
       geometric_mean = exp(mean(log(ResultValue))),
       EnoughSamplesForGeoMean = (n() >= 6), # Only do Geo Mean rule if at least 6 samples
       FailingGeoMeanRule = geometric_mean > unique(Ecoli_GeoMaxCol),
-      Failing = FailingTenPercentRule | (EnoughSamplesForGeoMean & FailingGeoMeanRule),
+      # Final results
+      # if it's BC, and outside the window, PASS it
+      # if it's failing the ten percent rule, FAIL it
+      # if it's enough samples for geo mean, and failing the geo mean rule, FAIL it
+      Failing = !Is_BC_And_Outside_Window & 
+        (FailingTenPercentRule | (EnoughSamplesForGeoMean & FailingGeoMeanRule)),
     )
 
   return(ecoli_summary)
@@ -106,8 +129,3 @@ num_sample_analysis <- full_results %>%
   group_by(SiteCode, EnoughSamplesForGeoMean) %>% 
   summarise(n()) %>%
   arrange(SiteCode)
-
-# other things to do:
-# * Class B and C should only compute 90-day windows
-#   * between April 15th and October 31st
-#   * guess: entirety of windows are fully in these months
