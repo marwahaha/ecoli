@@ -94,6 +94,6 @@ ggplot(failing_with_data ,
  theme(legend.position = "none")
 
 # other things to try:
+# Class B and C should only compute 90-day windows between April 15th and October 31s
 # * facet_grid
-# * Grouping by SiteClassification
 # * Change 90-day window range and see what happens
