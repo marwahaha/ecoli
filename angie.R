@@ -8,23 +8,21 @@ load("/home/kunal/Downloads/ChemFieldLab2018(2).rdata")
 
 
 # Get all "Regular" Ecoli samples (ignoring "Split" and "Duplicate")
-# FOR ANGIE: SHOULD WE INCLUDE SPLIT AND DUPLICATE SAMPLES?
 ecoli_all <- ChemFieldLab2018 %>%
   filter(Constituent =="E. coli (MPN)") %>%
   filter(SampleType == "Regular")
 
 
+# Function to check ecoli data against thresholds in a 90-day window
 analyze_90_day_window <- function(ecoli_df, start) {
-  # Get data in 90-day window
+  # Get data within 90-day window
   ecoli_90 <- ecoli_df %>%
-    filter(Date > start) %>%
-    filter(Date <= (start + 90))
+    filter(Date >= start) %>%
+    filter(Date < (start + 90))
 
   # Summarize and check thresholds
-  # RuleTenPercent is TRUE when the site passes the 10% rule
-  # RuleGeometricMean is TRUE when the site passes the geo mean rule
   ecoli_summary <- ecoli_90 %>%
-    group_by(Year, WaterBodyReport, SiteCode, SiteClassification, Ecoli_maxCol, Ecoli_GeoMaxCol)%>%
+    group_by(Year, WaterBodyReport, SiteCode, SiteClassification, Ecoli_maxCol, Ecoli_GeoMaxCol) %>%
     summarise(
       NumSamples = n(),
       # Ten percent rule
@@ -41,9 +39,8 @@ analyze_90_day_window <- function(ecoli_df, start) {
   return(ecoli_summary)
 }
 
-
+# Function to loop through all 90-day windows
 get_ecoli_results <- function(ecoli_df) {
-  
   # Earliest window starts 90 days before the first measurement.
   # Latest window starts date of the last measurement.
   earliest_window_start <- min(ecoli_df$Date) - 90
@@ -53,12 +50,19 @@ get_ecoli_results <- function(ecoli_df) {
   # * earliest_window_start <- min(ecoli_df$Date)
   # * latest_window_start <- max(ecoli_df$Date) - 90
   
+  
   ecoli_full_results <- c() 
   start <- earliest_window_start
   while (start <= latest_window_start) {
     # Decide if rules pass for this 90-day window, and put it in full results.
     ecoli_summary <- analyze_90_day_window(ecoli_df, start)
-    ecoli_full_results <- rbind(ecoli_full_results,  ecoli_summary)
+    
+    if (nrow(ecoli_summary) > 0) {
+      # the below line doesn't work if there are no rows in ecoli_summary
+      ecoli_summary$window_start <- start 
+      ecoli_full_results <- rbind(ecoli_full_results,  ecoli_summary)
+    }
+    
     # Move the 90-day window forward by one day.              
     start <- start + 1
   }
@@ -66,20 +70,21 @@ get_ecoli_results <- function(ecoli_df) {
   return(ecoli_full_results)
 }
 
+# Process the data
 full_results <- get_ecoli_results(ecoli_all)
 
-# Check if each area passed in all 90-day windows.
-out <- full_results %>%
-  group_by(Year, WaterBodyReport, SiteCode, SiteClassification, Ecoli_maxCol, Ecoli_GeoMaxCol)%>%
+# Check if each site failed in any of the 90-day windows.
+sites_all <- full_results %>%
+  group_by(Year, WaterBodyReport, SiteCode, SiteClassification, Ecoli_maxCol, Ecoli_GeoMaxCol) %>%
   summarize(fail=any(Failing))
 
-failing <- out %>% filter(fail == TRUE)
-passing <- out %>% filter(fail != TRUE)
-unknown <- out %>% filter(is.na(fail))
+sites_failing <- sites_all %>% filter(fail == TRUE)
+sites_passing <- sites_all %>% filter(fail != TRUE)
+sites_unknown <- sites_all %>% filter(is.na(fail))
 
 # Plot and inspect failing sites
 library(ggplot2)
-failing_with_data <- merge(ecoli_all, failing)
+failing_with_data <- merge(ecoli_all, sites_failing)
 failing_with_data$title <- paste("site=", failing_with_data$SiteCode, 
                                  " inst=", failing_with_data$Ecoli_maxCol, 
                                  " geo=", failing_with_data$Ecoli_GeoMaxCol,
@@ -99,13 +104,3 @@ ggplot(failing_with_data ,
 
 # To discuss: The earliest and latest samples affect the pass/fail
 #  Since many of the 90-day windows only have these samples in them
-
-#FOR KUNAL: CAN WE SEPARATE OUT THE PASSING INSTANTANEOUS AND GEO MEAN?
-# If something is failing, you want to know
-# Which of INST or GM is failing
-# and which 90-day intervals is it failing
-# For each site, for each 90-day window:
-# * tell me how mnay samples collected
-# * tell me if Geo mean pass
-# * tell me if 10% rule pass
-
