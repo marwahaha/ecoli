@@ -49,6 +49,8 @@ get_ecoli_results <- function(ecoli_df) {
   # One way to change it: 
   # * earliest_window_start <- min(ecoli_df$Date)
   # * latest_window_start <- max(ecoli_df$Date) - 90
+  # To discuss: The earliest and latest samples affect the pass/fail
+  #  since many of the 90-day windows only have these samples in them
   
   
   ecoli_full_results <- c() 
@@ -82,6 +84,7 @@ sites_failing <- sites_all %>% filter(fail == TRUE)
 sites_passing <- sites_all %>% filter(fail != TRUE)
 sites_unknown <- sites_all %>% filter(is.na(fail))
 
+
 # Plot and inspect failing sites
 library(ggplot2)
 failing_with_data <- merge(ecoli_all, sites_failing)
@@ -97,10 +100,14 @@ ggplot(failing_with_data ,
   facet_wrap(facets = vars(title)) +
  theme(legend.position = "none")
 
+
+## For fun:
+num_sample_analysis <- full_results %>% 
+  group_by(SiteCode, EnoughSamplesForGeoMean) %>% 
+  summarise(n()) %>%
+  arrange(SiteCode)
+
 # other things to do:
 # * Class B and C should only compute 90-day windows
-#    * between April 15th and October 31st
+#   * between April 15th and October 31st
 #   * guess: entirety of windows are fully in these months
-
-# To discuss: The earliest and latest samples affect the pass/fail
-#  Since many of the 90-day windows only have these samples in them
