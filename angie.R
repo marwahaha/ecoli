@@ -8,22 +8,17 @@ load("/home/kunal/Downloads/ChemFieldLab2018(2).rdata")
 
 
 # Get all "Regular" Ecoli samples (ignoring "Split" and "Duplicate")
+# FOR ANGIE: SHOULD WE INCLUDE SPLIT AND DUPLICATE SAMPLES?
 ecoli_all <- ChemFieldLab2018 %>%
   filter(Constituent =="E. coli (MPN)") %>%
   filter(SampleType == "Regular")
 
 
-# The threshold values come from Ecoli_maxCol and Ecoli_GeoMaxCol
-ecoli_without_threshold <- ecoli_all %>% filter(is.na(Ecoli_maxCol) | is.na(Ecoli_GeoMaxCol))
-# FOR ANGIE: WHAT DO WE DO WHEN THERE IS NO THRESHOLD?
-ecoli_with_threshold <- ecoli_all %>% filter(!is.na(Ecoli_maxCol) & !is.na(Ecoli_GeoMaxCol))
-
-
-analyze_90_day_window <- function(ecoli_df, start, end) {
+analyze_90_day_window <- function(ecoli_df, start) {
   # Get data in 90-day window
   ecoli_90 <- ecoli_df %>%
     filter(Date > start) %>%
-    filter(Date <= end)
+    filter(Date <= (start + 90))
 
   # Summarize and check thresholds
   ecoli_summary <- ecoli_90 %>%
@@ -36,8 +31,8 @@ analyze_90_day_window <- function(ecoli_df, start, end) {
       geometric_mean = exp(mean(log(ResultValue))),
       RuleGeometricMean= geometric_mean <= first(Ecoli_GeoMaxCol),
       Passing= RuleTenPercent & RuleGeometricMean,
-      PassInst=RuleTenPercent,# Which sites pass the instantaneous rule
-      PassGM=RuleGeometricMean,# Which sites pass the geo mean rule
+      PassInst=RuleTenPercent, # Which sites pass the instantaneous rule
+      PassGM=RuleGeometricMean, # Which sites pass the geo mean rule
     )
 
   return(ecoli_summary)
@@ -45,23 +40,29 @@ analyze_90_day_window <- function(ecoli_df, start, end) {
 
 
 #FOR KUNAL: CAN WE SEPARATE OUT THE PASSING INSTANTANEOUS AND GEO MEAN?
+# If something is failing, you want to know
+# Which of INST or GM is failing
+# and which 90-day intervals is it failing
 get_ecoli_results <- function(ecoli_df) {
-  # The initial 90-day window ends on the date of the last sample.
-  # The window moves back by 1 day each time until it includes the date of the first sample.
+  
+  # Earliest window starts 90 days before the first measurement.
+  # Latest window starts date of the last measurement.
+  earliest_window_start <- min(ecoli_df$Date) - 90
+  latest_window_start <- max(ecoli_df$Date) 
+  # If you change the above, it makes a big difference in the analysis!
+  # One way to change it: 
+  # * earliest_window_start <- min(ecoli_df$Date)
+  # * latest_window_start <- max(ecoli_df$Date) - 90
+  
   ecoli_full_results <- c() 
-  end <- max(ecoli_df$Date)
-  start <- end - 90
-  while (start >= (min(ecoli_df$Date) - 1)) {
+  start <- earliest_window_start
+  while (start <= latest_window_start) {
     # Decide if rules pass for this 90-day window, and put it in full results.
-    ecoli_summary <- analyze_90_day_window(ecoli_df, start, end)
-
-    ecoli_result <- ecoli_summary %>%
-      select(Year, WaterBodyReport, SiteCode, SiteClassification, Ecoli_maxCol, Ecoli_GeoMaxCol, Passing)
+    ecoli_summary <- analyze_90_day_window(ecoli_df, start)
+    ecoli_result <- ecoli_summary %>% select(Year, WaterBodyReport, SiteCode, SiteClassification, Ecoli_maxCol, Ecoli_GeoMaxCol, Passing)
     ecoli_full_results <- rbind(ecoli_full_results,  ecoli_result)
-    
-    # Move the 90-day window back by one day.              
-    start <-start - 1
-    end <- end - 1
+    # Move the 90-day window forward by one day.              
+    start <- start + 1
   }
   
   # Check if each area passed in all 90-day windows.
@@ -93,7 +94,15 @@ ggplot(failing_with_data ,
   facet_wrap(facets = vars(title)) +
  theme(legend.position = "none")
 
-# other things to try:
-# Class B and C should only compute 90-day windows between April 15th and October 31s
-# * facet_grid
-# * Change 90-day window range and see what happens
+# other things to do:
+# * Class B and C should only compute 90-day windows
+#    * between April 15th and October 31st
+#   * guess: entirety of windows are fully in these months
+
+# To discuss: The earliest and latest samples affect the pass/fail
+#  Since many of the 90-day windows only have these samples in them
+
+# * Geo mean only calc 6 samples in 90 day window
+
+
+
