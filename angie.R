@@ -124,8 +124,15 @@ ggplot(failing_with_data ,
  theme(legend.position = "none")
 
 
-## For fun:
+## For fun  - Sample analysis
+# Most of the time, there aren't enough samples in 90 day window for a geo mean):
+# Helpful for feedback -- what do we have to change to collect enough samples?
 num_sample_analysis <- full_results %>% 
   group_by(SiteCode, EnoughSamplesForGeoMean) %>% 
   summarise(n()) %>%
   arrange(SiteCode)
+
+## Future ideas:
+# * Pull data from portal, and then immediately run this analysis
+# * Add standards for each site classification 
+    # (inspect other states' protocols and see how similar they are to maine's)
