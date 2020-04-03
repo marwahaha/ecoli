@@ -1,9 +1,9 @@
 library(dplyr)
 library(lubridate)
-load("/home/kunal/Downloads/ChemFieldLab2018(2).rdata")
+#load("/home/kunal/Downloads/ChemFieldLab2018(2).rdata")
 #The path Angie needs to upload her data file
 #WHEN CONNECTED TO VPN AND PATH NOT SEEN
-#load("//pinwebserver01/C$/Shares/Penobscot Indian Nation Environmental Database/Reports/AnnualBaseline/2018/ChemFieldLab2018.RData")
+load("//pinwebserver01/C$/Shares/Penobscot Indian Nation Environmental Database/Reports/AnnualBaseline/2018/ChemFieldLab2018.RData")
 #WHEN CONNECTED TO SERVER
 #load("//pinwebserver01/Shares/Penobscot Indian Nation Environmental Database/Reports/AnnualBaseline/2018/ChemFieldLab2018.RData")
 
@@ -136,3 +136,42 @@ num_sample_analysis <- full_results %>%
 # * Pull data from portal, and then immediately run this analysis
 # * Add standards for each site classification 
     # (inspect other states' protocols and see how similar they are to maine's)
+
+
+# ANGIE'S SUMMARIES AND GRAPHS --------------------------------------------
+
+Fail_GM <- full_results %>% 
+  filter(EnoughSamplesForGeoMean == TRUE & FailingGeoMeanRule == TRUE) %>% 
+  group_by(WaterBodyReport, SiteCode) %>% 
+  summarize(NumIntervals = n(), MinGM = min(geometric_mean),
+            MeanGM = mean(geometric_mean),MaxGM = max(geometric_mean),
+            MinNumResults = min(NumSamples),MaxNumResults = max(NumSamples))
+
+Fail_TenPerc <- full_results %>% 
+  filter(FailingTenPercentRule == TRUE) %>% 
+  group_by(WaterBodyReport, SiteCode) %>% 
+  summarize(NumIntervals = n(), MinNumResults = min(NumSamples),
+            MaxNumResults = max(NumSamples))
+
+NumEcoliSamples <- full_results %>%
+  ungroup() %>% 
+  select(WaterBodyReport,SiteCode,window_start,NumSamples) %>% 
+  group_by(WaterBodyReport, SiteCode) %>% 
+  mutate(IntervalNum = 1:n()) %>% 
+  arrange(WaterBodyReport,SiteCode,window_start)
+
+# create list of sites in data to loop over 
+site_list_ECOLIi <- unique(NumEcoliSamples$SiteCode)
+#loops through the dataframe and creates a graph for each site
+#https://stackoverflow.com/questions/28758576/time-series-multiple-plot-for-different-group-in-r
+for (i in 1:length(site_list_ECOLIi)) {
+  ggplot(subset(NumEcoliSamples, NumEcoliSamples$SiteCode==site_list_ECOLIi[i]),
+         aes(window_start, NumSamples)) + 
+    geom_path() +
+    labs(title = paste("Number of E coli Results Per 90-day Interval","\n",site_list_ECOLIi[[i]]), x = "Start of Interval", y = "Number of Samples") +
+    theme(legend.title=element_blank()) + 
+    theme(legend.position="top") + 
+    theme(plot.title = element_text(hjust = 0.5)) +
+    theme(axis.text.x = element_text(angle=45, hjust=1, size=8),strip.text.x = element_text(angle = 45)) + 
+    ggsave(file = paste(site_list_ECOLIi[[i]],"_NumEcoliSamplesIn90DayInt_2018.png"),width=11,height=8.5,dpi=300)
+}
