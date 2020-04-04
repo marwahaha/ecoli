@@ -111,7 +111,7 @@ sites_unknown <- sites_all %>% filter(is.na(fail))
 # Plot and inspect failing sites
 library(ggplot2)
 failing_with_data <- merge(ecoli_all, sites_failing)
-failing_with_data$title <- paste("site=", failing_with_data$SiteName, 
+failing_with_data$title <- paste("site=", failing_with_data$SiteCode, 
                                  " inst=", failing_with_data$Ecoli_maxCol, 
                                  " geo=", failing_with_data$Ecoli_GeoMaxCol,
                                  sep="")
