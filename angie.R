@@ -1,5 +1,6 @@
 library(dplyr)
 library(lubridate)
+library(ggplot2)
 #load("/home/kunal/Downloads/ChemFieldLab2018(2).rdata")
 #The path Angie needs to upload her data file
 #WHEN CONNECTED TO VPN AND PATH NOT SEEN
@@ -49,8 +50,8 @@ analyze_90_day_window <- function(ecoli_df, start) {
       FailingTenPercentRule = NumSamplesAboveTenPercentThreshold > TenPercentOfSamples,
       # Geo mean rule
       geometric_mean = exp(mean(log(ResultValue))),
-      EnoughSamplesForGeoMean = (n() >= 6), # Only do Geo Mean rule if at least 6 samples
-      FailingGeoMeanRule = geometric_mean > unique(Ecoli_GeoMaxCol),
+      EnoughSamplesForGeoMean = (n() >= 6), # test whether there are at least 6 samples
+      FailingGeoMeanRule = geometric_mean > unique(Ecoli_GeoMaxCol),#tests for failure regardless of # number samples
       # Final results
       # if it's BC, and outside the window, PASS it
       # if it's failing the ten percent rule, FAIL it
@@ -166,12 +167,54 @@ site_list_ECOLIi <- unique(NumEcoliSamples$SiteCode)
 #https://stackoverflow.com/questions/28758576/time-series-multiple-plot-for-different-group-in-r
 for (i in 1:length(site_list_ECOLIi)) {
   ggplot(subset(NumEcoliSamples, NumEcoliSamples$SiteCode==site_list_ECOLIi[i]),
-         aes(window_start, NumSamples)) + 
-    geom_path() +
-    labs(title = paste("Number of E coli Results Per 90-day Interval","\n",site_list_ECOLIi[[i]]), x = "Start of Interval", y = "Number of Samples") +
+         aes(window_start, NumSamples, colour = NumSamples)) + 
+    geom_point() +
+    scale_x_date(date_breaks = "1 month", date_labels = "%b %d") +
+    labs(title = paste("Number of E coli Results Per 90-day Interval\n2018","\n",site_list_ECOLIi[[i]]), x = "Start of Interval", y = "Number of Samples") +
     theme(legend.title=element_blank()) + 
     theme(legend.position="top") + 
     theme(plot.title = element_text(hjust = 0.5)) +
     theme(axis.text.x = element_text(angle=45, hjust=1, size=8),strip.text.x = element_text(angle = 45)) + 
     ggsave(file = paste(site_list_ECOLIi[[i]],"_NumEcoliSamplesIn90DayInt_2018.png"),width=11,height=8.5,dpi=300)
 }
+
+SiteRun <- ChemFieldLab2018 %>% 
+  select(SiteCode, RunCode) %>% 
+  group_by(RunCode, SiteCode) %>% 
+  mutate(Combo = 1:n()) %>% 
+  filter(Combo == 1) %>% 
+  select(SiteCode, RunCode)
+
+NumEcoliSamples <- left_join(NumEcoliSamples,SiteRun)
+
+#WBR_list_ECOLIj <- unique(NumEcoliSamples$WaterBodyReport)
+Run_list_ECOLIj <- unique(NumEcoliSamples$RunCode)
+
+for (j in 1:length(Run_list_ECOLIj)) {
+  ggplot(subset(NumEcoliSamples, NumEcoliSamples$RunCode==Run_list_ECOLIj[j]),
+         aes(window_start, NumSamples, color = SiteCode)) + 
+    geom_point(position=position_jitter(h=0.1, w=0.1),
+               shape = 21, alpha = 0.5, size = 3) +
+    scale_x_date(date_breaks = "1 month", date_labels = "%b %d") +
+    labs(title = paste("Number of E coli Results Per 90-day Interval\n2018","\n",Run_list_ECOLIj[[j]]), x = "Start of Interval", y = "Number of Samples") +
+    #theme(legend.title=element_blank()) + 
+    #theme(legend.position="top") + 
+    theme(legend.position = "none") + 
+    theme(plot.title = element_text(hjust = 0.5)) +
+    theme(axis.text.x = element_text(angle=45, hjust=1, size=8),strip.text.x = element_text(angle = 45)) + 
+    ggsave(file = paste(Run_list_ECOLIj[[j]],"_NumEcoliSamplesIn90DayInt_2018.png"),width=11,height=8.5,dpi=300)
+}
+
+
+A <- ggplot(NumEcoliSamples, aes(window_start, NumSamples, color = SiteCode)) + 
+  geom_point(position=position_jitter(h=0.1, w=0.1),
+             shape = 21, alpha = 0.5, size = 3) +
+  facet_wrap(RunCode ~.) + 
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %d") +
+  labs(title = "Number of E coli Results Per 90-day Interval - BY RUN\n2018\n", x = "Start of Interval", y = "Number of Samples") +
+  #theme(legend.title=element_blank()) + 
+  #theme(legend.position="top") + 
+  theme(legend.position = "none") + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle=45, hjust=1, size=8))
+A
