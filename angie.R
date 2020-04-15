@@ -140,7 +140,7 @@ num_sample_analysis <- full_results %>%
 
 
 # ANGIE'S SUMMARIES AND GRAPHS --------------------------------------------
-
+setwd("~/Documents/ecoli")
 Fail_GM <- full_results %>% 
   filter(EnoughSamplesForGeoMean == TRUE & FailingGeoMeanRule == TRUE) %>% 
   group_by(WaterBodyReport, SiteCode) %>% 
@@ -148,11 +148,27 @@ Fail_GM <- full_results %>%
             MeanGM = mean(geometric_mean),MaxGM = max(geometric_mean),
             MinNumResults = min(NumSamples),MaxNumResults = max(NumSamples))
 
+write.csv(Fail_GM, file = "Output/2018Ecoli_GMViolations-90dayInt_ALL.csv")
+
+Fail_GM_Each <- full_results %>%
+  ungroup() %>% 
+  filter(EnoughSamplesForGeoMean == TRUE & FailingGeoMeanRule == TRUE) %>% 
+  select(Year,WaterBodyReport,SiteCode,window_start,NumSamples)
+
 Fail_TenPerc <- full_results %>% 
   filter(FailingTenPercentRule == TRUE) %>% 
   group_by(WaterBodyReport, SiteCode) %>% 
   summarize(NumIntervals = n(), MinNumResults = min(NumSamples),
+            MeanNumResults = mean(NumSamples),
             MaxNumResults = max(NumSamples))
+
+write.csv(Fail_TenPerc, file = "Output/2018Ecoli_TenPercViolations-90dayInt_ALL.csv")
+
+
+Fail_TenPerc_Each <- full_results %>% 
+  ungroup() %>% 
+  filter(FailingTenPercentRule == TRUE) %>% 
+  select(Year,WaterBodyReport,SiteCode,window_start,NumSamples)
 
 NumEcoliSamples <- full_results %>%
   ungroup() %>% 
@@ -160,6 +176,59 @@ NumEcoliSamples <- full_results %>%
   group_by(WaterBodyReport, SiteCode) %>% 
   mutate(IntervalNum = 1:n()) %>% 
   arrange(WaterBodyReport,SiteCode,window_start)
+
+SiteRun <- ChemFieldLab2018 %>% 
+  select(SiteCode, RunCode) %>% 
+  group_by(RunCode, SiteCode) %>% 
+  mutate(Combo = 1:n()) %>% 
+  filter(Combo == 1) %>% 
+  select(SiteCode, RunCode)
+
+NumEcoliSamples <- left_join(NumEcoliSamples,SiteRun)
+
+#GRAPHS OF GM FAILURES
+rptcat_list_ECOLIa <- unique(Fail_GM_Each$WaterBodyReport)
+for (a in 1:length(rptcat_list_ECOLIa)) {
+  Fail_GM_Each_Sub <- Fail_GM_Each %>% 
+    filter(Fail_GM_Each$WaterBodyReport==rptcat_list_ECOLIa[a])
+  ggplot(Fail_GM_Each_Sub,
+                aes(window_start, NumSamples, colour = SiteCode)) + 
+  geom_point() + 
+  facet_grid(SiteCode ~.) + 
+  scale_x_date(date_breaks = "1 day", date_labels = "%b %d") +
+  labs(title = "E. coli Geometric Mean Failures in a 90-day Interval - BY RUN\n2018\n", x = "Start of Interval", y = "Number of Samples") +
+  scale_y_continuous(limits=c(0, 8),breaks=seq(0,8,2)) + 
+  #theme(legend.position="top") + 
+  #scale_y_continuous(limits=c(0, 8)) + 
+  theme(legend.position = "none") + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle=45, hjust=1, size=8))
+  ggsave(file = paste0("Images/",rptcat_list_ECOLIa[a],"_SitesFailGMIn90DayInt_2018.png"),width=11,height=8.5,dpi=300)
+  
+}#for (a in 1:length(site_list_ECOLIa))
+
+#GRAPHS OF TENPERC FAILURES
+rptcat_list_ECOLIb <- unique(Fail_TenPerc_Each$WaterBodyReport)
+for (b in 1:length(rptcat_list_ECOLIb)) {
+  Fail_TenPerc_Each_Sub <- Fail_TenPerc_Each %>% 
+    filter(Fail_TenPerc_Each$WaterBodyReport==rptcat_list_ECOLIb[b])
+  ggplot(Fail_TenPerc_Each_Sub,
+         aes(window_start, NumSamples, colour = SiteCode)) + 
+    geom_point() + 
+    facet_grid(SiteCode ~.) + 
+    scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
+    labs(title = "E. coli Ten Percent Failures in a 90-day Interval - BY RUN\n2018\n", x = "Start of Interval", y = "Number of Samples") +
+    scale_y_continuous(limits=c(0, 8),breaks=seq(0,8,2)) + 
+    #theme(legend.position="top") + 
+    #scale_y_continuous(limits=c(0, 8)) + 
+    theme(legend.position = "none") + 
+    theme(plot.title = element_text(hjust = 0.5)) +
+    theme(axis.text.x = element_text(angle=45, hjust=1, size=8))
+  ggsave(file = paste0("Images/",rptcat_list_ECOLIb[b],"_SitesFailTenPercIn90DayInt_2018.png"),width=11,height=8.5,dpi=300)
+  
+}#for (b in 1:length(rptcat_list_ECOLIb))
+
+
 
 # create list of sites in data to loop over 
 site_list_ECOLIi <- unique(NumEcoliSamples$SiteCode)
@@ -175,17 +244,8 @@ for (i in 1:length(site_list_ECOLIi)) {
     theme(legend.position="top") + 
     theme(plot.title = element_text(hjust = 0.5)) +
     theme(axis.text.x = element_text(angle=45, hjust=1, size=8),strip.text.x = element_text(angle = 45)) + 
-    ggsave(file = paste(site_list_ECOLIi[[i]],"_NumEcoliSamplesIn90DayInt_2018.png"),width=11,height=8.5,dpi=300)
+    ggsave(file = paste0("Images/",site_list_ECOLIi[[i]],"_NumEcoliSamplesIn90DayInt_2018.png"),width=11,height=8.5,dpi=300)
 }
-
-SiteRun <- ChemFieldLab2018 %>% 
-  select(SiteCode, RunCode) %>% 
-  group_by(RunCode, SiteCode) %>% 
-  mutate(Combo = 1:n()) %>% 
-  filter(Combo == 1) %>% 
-  select(SiteCode, RunCode)
-
-NumEcoliSamples <- left_join(NumEcoliSamples,SiteRun)
 
 #WBR_list_ECOLIj <- unique(NumEcoliSamples$WaterBodyReport)
 Run_list_ECOLIj <- unique(NumEcoliSamples$RunCode)
@@ -193,8 +253,9 @@ Run_list_ECOLIj <- unique(NumEcoliSamples$RunCode)
 for (j in 1:length(Run_list_ECOLIj)) {
   ggplot(subset(NumEcoliSamples, NumEcoliSamples$RunCode==Run_list_ECOLIj[j]),
          aes(window_start, NumSamples, color = SiteCode)) + 
-    geom_point(position=position_jitter(h=0.1, w=0.1),
-               shape = 21, alpha = 0.5, size = 3) +
+    #geom_point(position=position_jitter(h=0.1, w=0.1),
+    #           shape = 21, alpha = 0.5, size = 3) +
+    geom_line() + 
     scale_x_date(date_breaks = "1 month", date_labels = "%b %d") +
     labs(title = paste("Number of E coli Results Per 90-day Interval\n2018","\n",Run_list_ECOLIj[[j]]), x = "Start of Interval", y = "Number of Samples") +
     #theme(legend.title=element_blank()) + 
@@ -202,13 +263,13 @@ for (j in 1:length(Run_list_ECOLIj)) {
     theme(legend.position = "none") + 
     theme(plot.title = element_text(hjust = 0.5)) +
     theme(axis.text.x = element_text(angle=45, hjust=1, size=8),strip.text.x = element_text(angle = 45)) + 
-    ggsave(file = paste(Run_list_ECOLIj[[j]],"_NumEcoliSamplesIn90DayInt_2018.png"),width=11,height=8.5,dpi=300)
+    ggsave(file = paste0("Images/",Run_list_ECOLIj[[j]],"_NumEcoliSamplesIn90DayInt_2018.png"),width=11,height=8.5,dpi=300)
 }
 
-
-A <- ggplot(NumEcoliSamples, aes(window_start, NumSamples, color = SiteCode)) + 
-  geom_point(position=position_jitter(h=0.1, w=0.1),
-             shape = 21, alpha = 0.5, size = 3) +
+NumSmpPerIntervByRun <- ggplot(NumEcoliSamples, aes(window_start, NumSamples, color = SiteCode)) + 
+  #geom_point(position=position_jitter(h=0.1, w=0.1),
+  #           shape = 21, alpha = 0.5, size = 1) +
+  geom_line() + 
   facet_wrap(RunCode ~.) + 
   scale_x_date(date_breaks = "1 month", date_labels = "%b %d") +
   labs(title = "Number of E coli Results Per 90-day Interval - BY RUN\n2018\n", x = "Start of Interval", y = "Number of Samples") +
@@ -217,4 +278,4 @@ A <- ggplot(NumEcoliSamples, aes(window_start, NumSamples, color = SiteCode)) +
   theme(legend.position = "none") + 
   theme(plot.title = element_text(hjust = 0.5)) +
   theme(axis.text.x = element_text(angle=45, hjust=1, size=8))
-A
+NumSmpPerIntervByRun
